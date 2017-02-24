@@ -17,52 +17,9 @@ LOGDAYS=30
 JAVA_BIN=$JAVA_HOME/bin
 
 
-function askYesNo() {
-	local answerYN="$1"
-
-	echo -e -n "${*:2} [\e[49;32;3m$1\e[m] "
-
-	read answerYN
-	while [ "$answerYN" != "y" -a "$answerYN" != "n" -a "$answerYN" != "" ] ; do
-		echo "Invalid value. Please write 'y' or 'n'"
-		echo -e -n "${*:2} [\e[49;32;3m$1\e[m] "
-		read answerYN
-	done
-	if [ "$answerYN" = "" ] ; then
-			answerYN="$1"
-	fi
-
-	[ "$answerYN" = "y" ]
-}
-
+source utils.sh
 
 LOGS_FOLDER=""
-if [ "$JBOSS_HOME" != "" ]; then
-	APPSERVER_NAME="$JBOSS_NAME"
-	PROCESS_USER="jboss"
-	if [ -d $JBOSS_HOME/server/outsystems/ ]; then
-		LOGS_FOLDER="$JBOSS_HOME/server/outsystems/log/"
-		PROCESS_PID=$(ps -u $PROCESS_USER 2>>/dev/null | grep java | gawk '{print $1}')
-	else
-		LOGS_FOLDER="$JBOSS_HOME/standalone/log/"
-		if [ -f /var/run/jboss-as/jboss-as-standalone-outsystems.pid ]; then
-			PROCESS_PID=$(cat /var/run/jboss-as/jboss-as-standalone-outsystems.pid)
-			PID_MQ=$(cat /var/run/jboss-as/jboss-as-standalone-outsystems-mq.pid)
-		else
-			PROCESS_PID=$(ps -ef | grep java.*standalone-outsystems.xml | grep -v grep | awk '{print $2}')
-			PID_MQ=$(ps -ef | grep java.*standalone-outsystems-mq.xml | grep -v grep | awk '{print $2}')
-		fi
-	fi
-fi
-
-if [ "$WILDFLY_HOME" != "" ]; then
-       APPSERVER_NAME=$WILDFLY_NAME
-       PROCESS_USER="wildfly"
-       LOGS_FOLDER=$WILDFLY_HOME/standalone/log/
-       PROCESS_PID=$(ps -ef | grep java.*standalone-outsystems.xml | grep -v grep | awk '{print $2}')
-       PID_MQ=$(ps -ef | grep java.*standalone-outsystems-mq.xml | grep -v grep | awk '{print $2}')
-       JBOSS_HOME=$WILDFLY_HOME
-fi
 
 if [ "$WL_DOMAIN" != "" ]; then
 	APPSERVER_NAME="$WEBLOGIC_NAME"
@@ -79,8 +36,6 @@ if [ "$WL_DOMAIN" != "" ]; then
 	fi
 	LOGS_FOLDER="$WL_DOMAIN/servers/$WL_MANAGED_SERVER_NAME/logs"
 fi
-
-
 
 if [ "$PROCESS_PID" == "" ]; then
 	echo "Could not find the $APPSERVER_NAME process."
@@ -116,37 +71,6 @@ if [ "$APPSERVER_NAME" == "$WEBLOGIC_NAME" ]; then
 	su $PROCESS_USER - -s /bin/bash -c "cd $MW_HOME/utils/bsu ; ./bsu.sh -prod_dir=$WL_HOME -status=applied -verbose -view > $DIR/weblogic_patches 2>> $DIR/errors.log"
 fi
 
-
-#JBoss Specific
-if [ "$APPSERVER_NAME" == "$JBOSS_NAME" -o "$APPSERVER_NAME" == "$WILDFLY_NAME" ]; then
-	echo "    * Configurations"
-	# H2 directory
-	if [ -d $JBOSS_HOME/server/outsystems/data/h2/ ] ; then 
-		ls -lh $JBOSS_HOME/server/outsystems/data/h2/ > $DIR/h2_dir
-	fi
-	
-	# Configuration
-	if [ -d $JBOSS_HOME/server/outsystems/ ]; then
-		$CP $JBOSS_HOME/bin/run.sh $DIR 2>> $DIR/errors.log
-		$CP $JBOSS_HOME/bin/run.conf $DIR 2>> $DIR/errors.log
-		# jboss service configuration
-		$CP $JBOSS_HOME/server/outsystems/conf/jboss-service.xml  $DIR 2>> $DIR/errors.log
-		# jboss connectors
-		$CP $JBOSS_HOME/server/outsystems/deploy/jbossweb.sar/server.xml $DIR 2>> $DIR/errors.log
-	else
-		$CP -r $JBOSS_HOME/standalone/configuration/ $DIR 2>> $DIR/errors.log
-		$CP -r $JBOSS_HOME/standalone/configuration-mq/ $DIR 2>> $DIR/errors.log
-		$CP $JBOSS_HOME/bin/standalone-outsystems.conf $DIR 2>> $DIR/errors.log
-		$CP $JBOSS_HOME/bin/standalone-outsystems-mq.conf $DIR 2>> $DIR/errors.log
-		$CP $JBOSS_HOME/bin/standalone-outsystems-mq.properties $DIR 2>> $DIR/errors.log
-		$CP $JBOSS_HOME/bin/standalone-outsystems.properties $DIR 2>> $DIR/errors.log
-		if [ -f /var/log/jboss-as/console-outsystems.log ]; then
-		  $CP /var/log/jboss-as/console-outsystems.log $DIR 2>> $DIR/errors.log
-		fi
-	fi
-fi
-
-
 if [ "$PROCESS_PID" == "" ]; then
 	echo "not collecting memory dump because couldn't find process pid"
 else
@@ -170,9 +94,7 @@ if [ "$LOGS_FOLDER" == "" ]; then
 else
 	echo "Gathering $APPSERVER_NAME Logs..."
 	# Application Server Logs
-	# $CP $LOGS_FOLDER/*.log* $DIR 2>> $DIR/errors.log
 	find $LOGS_FOLDER/ -name '*.log*' -ctime -$LOGDAYS -exec $CP \{\} $DIR \;
-	# $CP $LOGS_FOLDER/*.out* $DIR 2>> $DIR/errors.log
 	find $LOGS_FOLDER/ -name '*.out*' -ctime -$LOGDAYS -exec $CP \{\} $DIR \;
 
 	if [ -d $JBOSS_HOME/standalone/log-mq ] ; then

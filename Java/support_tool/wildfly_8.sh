@@ -16,43 +16,9 @@ LOGDAYS=30
 JAVA_BIN=$JAVA_HOME/bin
 
 
-function askYesNo() {
-	local answerYN="$1"
-
-	echo -e -n "${*:2} [\e[49;32;3m$1\e[m] "
-
-	read answerYN
-	while [ "$answerYN" != "y" -a "$answerYN" != "n" -a "$answerYN" != "" ] ; do
-		echo "Invalid value. Please write 'y' or 'n'"
-		echo -e -n "${*:2} [\e[49;32;3m$1\e[m] "
-		read answerYN
-	done
-	if [ "$answerYN" = "" ] ; then
-			answerYN="$1"
-	fi
-
-	[ "$answerYN" = "y" ]
-}
-
+source utils.sh
 
 LOGS_FOLDER=""
-if [ "$JBOSS_HOME" != "" ]; then
-	APPSERVER_NAME="$JBOSS_NAME"
-	PROCESS_USER="jboss"
-	if [ -d $JBOSS_HOME/server/outsystems/ ]; then
-		LOGS_FOLDER="$JBOSS_HOME/server/outsystems/log/"
-		PROCESS_PID=$(ps -u $PROCESS_USER 2>>/dev/null | grep java | gawk '{print $1}')
-	else
-		LOGS_FOLDER="$JBOSS_HOME/standalone/log/"
-		if [ -f /var/run/jboss-as/jboss-as-standalone-outsystems.pid ]; then
-			PROCESS_PID=$(cat /var/run/jboss-as/jboss-as-standalone-outsystems.pid)
-			PID_MQ=$(cat /var/run/jboss-as/jboss-as-standalone-outsystems-mq.pid)
-		else
-			PROCESS_PID=$(ps -ef | grep java.*standalone-outsystems.xml | grep -v grep | awk '{print $2}')
-			PID_MQ=$(ps -ef | grep java.*standalone-outsystems-mq.xml | grep -v grep | awk '{print $2}')
-		fi
-	fi
-fi
 
 if [ "$WILDFLY_HOME" != "" ]; then
        APPSERVER_NAME=$WILDFLY_NAME
@@ -62,24 +28,6 @@ if [ "$WILDFLY_HOME" != "" ]; then
        PID_MQ=$(ps -ef | grep java.*standalone-outsystems-mq.xml | grep -v grep | awk '{print $2}')
        JBOSS_HOME=$WILDFLY_HOME
 fi
-
-if [ "$WL_DOMAIN" != "" ]; then
-	APPSERVER_NAME="$WEBLOGIC_NAME"
-	if [ "$PROCESS_USER" == "" ]; then
-		PROCESS_USER=$(stat -c %U $WL_DOMAIN)
-	fi
-	
-	if [ "$WL_MANAGED_SERVER_NAME" == "" ]; then
-		PROCESS_PID=$(ps -u $PROCESS_USER --format "pid cmd" 2>>/dev/null | grep java | grep weblogic.Server | grep -v weblogic.Name=$WL_ADMIN_SERVER_NAME | gawk '{print $1}')
-		ADMINSERVER_PID=$(ps -u $PROCESS_USER --format "pid cmd" 2>>/dev/null | grep java | grep weblogic.Server | grep weblogic.Name=$WL_ADMIN_SERVER_NAME | gawk '{print $1}')
-		WL_MANAGED_SERVER_NAME=$(ps --pid $PROCESS_PID --format cmd | grep java | sed 's/.*weblogic.Name=[ ]*\([^ ]*\).*/\1/g')
-	else
-		PROCESS_PID=$(ps -u $PROCESS_USER --format "pid cmd" 2>>/dev/null | grep java | grep weblogic.Server | grep weblogic.Name=$WL_MANAGED_SERVER_NAME | gawk '{print $1}')
-	fi
-	LOGS_FOLDER="$WL_DOMAIN/servers/$WL_MANAGED_SERVER_NAME/logs"
-fi
-
-
 
 if [ "$PROCESS_PID" == "" ]; then
 	echo "Could not find the $APPSERVER_NAME process."
@@ -162,9 +110,7 @@ if [ "$LOGS_FOLDER" == "" ]; then
 else
 	echo "Gathering $APPSERVER_NAME Logs..."
 	# Application Server Logs
-	# $CP $LOGS_FOLDER/*.log* $DIR 2>> $DIR/errors.log
 	find $LOGS_FOLDER/ -name '*.log*' -ctime -$LOGDAYS -exec $CP \{\} $DIR \;
-	# $CP $LOGS_FOLDER/*.out* $DIR 2>> $DIR/errors.log
 	find $LOGS_FOLDER/ -name '*.out*' -ctime -$LOGDAYS -exec $CP \{\} $DIR \;
 
 	if [ -d $JBOSS_HOME/standalone/log-mq ] ; then
@@ -172,6 +118,4 @@ else
 		find $JBOSS_HOME/standalone/log-mq/ -name '*.log*' -ctime -$LOGDAYS -exec $CP \{\} $DIR/log-mq/ \;
 	fi
 fi
-
-
 
