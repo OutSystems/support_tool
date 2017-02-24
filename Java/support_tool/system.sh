@@ -3,6 +3,8 @@
 DIR=$1
 CP='cp -p'
 
+source /etc/sysconfig/outsystems
+
 cat /proc/cpuinfo > $DIR/cpuinfo 2>> $DIR/errors.log 
 cat /proc/meminfo > $DIR/meminfo 2>> $DIR/errors.log
 df -h -l > $DIR/partInfo 2>> $DIR/errors.log

@@ -9,6 +9,7 @@ APPSERVER_NAME="Application Server"
 WEBLOGIC_NAME="WebLogic"
 JBOSS_NAME="JBoss"
 WILDFLY_NAME="Wildfly"
+WL_ADMIN_SERVER_NAME="AdminServer"
 
 LOGDAYS=30
 
@@ -106,6 +107,13 @@ else
 				su $PROCESS_USER - -s /bin/bash -c "$JAVA_BIN/jstack $PID_MQ > $DIR/threads_"$APPSERVER_NAME"_mq.log 2>> $DIR/errors.log"
 			fi
 		fi
+fi
+
+
+# Weblogic Specific
+if [ "$APPSERVER_NAME" == "$WEBLOGIC_NAME" ]; then
+	echo "    * Patch information"
+	su $PROCESS_USER - -s /bin/bash -c "cd $MW_HOME/utils/bsu ; ./bsu.sh -prod_dir=$WL_HOME -status=applied -verbose -view > $DIR/weblogic_patches 2>> $DIR/errors.log"
 fi
 
 
